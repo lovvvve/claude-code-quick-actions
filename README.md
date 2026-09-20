@@ -104,7 +104,7 @@ hooks/actions.ts          你的动作清单
 ## 已知限制
 
 - **API 是 early access**，Claude Code 版本升级可能改接口。真出问题的表现是按钮不画，不影响正常使用。
-- `kind: "prompt"` 发出去的消息，模型那边会看到一层「The quick-actions plugin sent a message: …」的包装说明。介意的话用 `command` 或 `fill`。
+- `kind: "prompt"` 发出去的消息，模型那边会看到一层「The quick-actions plugin sent a message: …」外加一句解释。这层包装**去不掉**：插件自己提交的 prompt 不会走自己的 `prompt.submit` hook（引擎防再入，debug 日志里写作 `skipped: re-entry`），所以没法在插件内部把 `origin` 抹掉。实测模型能正确把它当成你说的话处理，只是多占几行上下文。介意的话改用 `fill`——代价是多按一次回车。
 - 按钮带只在终端界面（`terminal` surface）上画。
 - 数字键触发要求输入框为空，这是引擎的规则，不是插件能改的。
 

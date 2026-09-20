@@ -104,7 +104,7 @@ Each button's `onPress` stays in the plugin's own environment and calls `$.comma
 ## Known limits
 
 - **The API is early access.** A Claude Code release may change it. The failure mode is the band not drawing; nothing else breaks.
-- A `kind: "prompt"` message reaches the model wrapped in a note saying the plugin sent it. Use `command` or `fill` if that bothers you.
+- A `kind: "prompt"` message reaches the model wrapped in a note saying the plugin sent it, plus a sentence of explanation. That wrapper **cannot be removed**: a prompt a plugin submits does not run through that same plugin's own `prompt.submit` hook (the engine guards against re-entry — `skipped: re-entry` in the debug log), so there is no way to drop the `origin` from inside the plugin. In practice the model reads it correctly as something you said; it just costs a few lines of context. Use `fill` if that bothers you — at the cost of one extra Enter.
 - The band is drawn on the `terminal` surface only.
 - Digit hotkeys require an empty composer. That is the engine's rule, not the plugin's.
 
