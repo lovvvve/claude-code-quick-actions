@@ -1,0 +1,12 @@
+{
+  "name": "quick-actions",
+  "version": "0.1.0",
+  "description": "在 Claude Code 输入框上方常驻一排快捷动作：空输入框下按数字键即可发送常用 prompt、运行斜杠命令或填充草稿",
+  "author": {
+    "name": "lovvvve"
+  },
+  "homepage": "https://github.com/lovvvve/claude-code-quick-actions",
+  "repository": "https://github.com/lovvvve/claude-code-quick-actions",
+  "license": "MIT",
+  "keywords": ["quick-actions", "composer", "ui", "function-hooks", "productivity"]
+}

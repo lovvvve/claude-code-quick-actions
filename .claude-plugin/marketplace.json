@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "claude-code-quick-actions",
+  "description": "Global Quick Actions for the Claude Code composer",
+  "owner": {
+    "name": "lovvvve"
+  },
+  "plugins": [
+    {
+      "name": "quick-actions",
+      "description": "在 Claude Code 输入框上方常驻一排快捷动作：空输入框下按数字键即可发送常用 prompt、运行斜杠命令或填充草稿",
+      "author": {
+        "name": "lovvvve"
+      },
+      "category": "productivity",
+      "source": "./plugins/quick-actions",
+      "homepage": "https://github.com/lovvvve/claude-code-quick-actions"
+    }
+  ]
+}
