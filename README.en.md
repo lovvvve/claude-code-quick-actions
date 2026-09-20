@@ -37,14 +37,33 @@ Start a new session and the band appears above the composer.
 
 ## Configure
 
-The action list lives in `plugins/quick-actions/hooks/actions.ts`:
+Three layers, nearest wins, all optional:
 
-```ts
-export const ACTIONS: QuickAction[] = [
-  { hotkey: "1", label: "Diff",   kind: "fill",    text: "Summarise the current git working tree changes and their blast radius." },
-  { hotkey: "3", label: "Commit", kind: "command", text: "commit" },
-  { hotkey: "9", label: "Wrap up", kind: "prompt", text: "Turn today's changes into one commit and push it." },
+| Priority | Location | Good for |
+|---|---|---|
+| 1 | `<project>/.claude/quick-actions.json` | Actions for this project only |
+| 2 | `~/.claude/quick-actions.json` | The few you want everywhere |
+| 3 | `plugins/quick-actions/hooks/actions.ts` | The plugin's own defaults, used when neither file exists |
+
+**Editing the JSON needs no restart and no reload** — the plugin checks the file's mtime every 2 seconds and swaps the list when it changes. Creating, editing, deleting and switching between projects are all live.
+
+Two shapes, a bare array or an object with a `label`:
+
+```json
+[
+  { "hotkey": "1", "label": "Confirm", "kind": "prompt", "text": "Confirmed" },
+  { "hotkey": "2", "label": "Continue", "kind": "prompt", "text": "Continue" }
 ]
+```
+
+```json
+{
+  "label": "Quick",
+  "actions": [
+    { "hotkey": "1", "label": "Commit & push", "kind": "command", "text": "gcmp" },
+    { "hotkey": "q", "label": "Diff",          "kind": "fill",    "text": "Summarise the current working tree changes and their blast radius." }
+  ]
+}
 ```
 
 | Field | Meaning |
@@ -54,6 +73,8 @@ export const ACTIONS: QuickAction[] = [
 | `kind` | `command` / `prompt` / `fill`, see below |
 | `text` | Command name without `/` for `command`; the body for `prompt` and `fill` |
 
+The top-level `label` sets the hint to the left of the buttons; `""` drops it, and leaving it out keeps the plugin's own.
+
 The three kinds:
 
 | kind | What it does | Good for |
@@ -62,11 +83,11 @@ The three kinds:
 | `prompt` | Submits to the model straight away | Fixed one-liners that need no editing |
 | `fill` | Only fills the composer; you finish and hit Enter | Templates that need details, e.g. "take a look at ___" |
 
-`BAND_LABEL` sets the hint drawn to the left of the buttons; set it to `""` to drop it.
+Broken JSON does not make the buttons vanish: the plugin keeps the last good list and says once in the transcript which file failed and why.
 
-### Making edits take effect
+### Changing the plugin's own defaults
 
-Depends how you installed it:
+`actions.ts` is the fallback when neither JSON file exists. How an edit to it takes effect depends on the install:
 
 | Install method | After editing `actions.ts` |
 |---|---|
@@ -74,7 +95,7 @@ Depends how you installed it:
 | `claude --plugin-dir <dir>` | Takes effect on save; the directory is watched |
 | Cloned into `~/.claude/skills/quick-actions/` | Takes effect on save; that location auto-loads and is watched |
 
-Use one of the latter two while iterating. A marketplace install is also overwritten by `/plugin update`, so fork the repo or use the `~/.claude/skills/` route to keep your own list.
+For day-to-day tweaks use the JSON: that path is live under every install method, and `/plugin update` never overwrites it.
 
 ## Keys
 
@@ -93,11 +114,14 @@ A Claude Code function hooks plugin can take over sites in the interface through
 
 ```
 hooks/hooks.json          points at the module below
-hooks/quick-actions.tsx   register(on) registers the ui.render hook, draws a Button per action
-hooks/actions.ts          your action list
+hooks/quick-actions.tsx   register(on): session.start locates the config and starts the poll, ui.render draws the buttons
+hooks/config.ts           parsing and validation of the JSON; pure functions, no engine access
+hooks/actions.ts          the plugin's own default list
 ```
 
 Each button's `onPress` stays in the plugin's own environment and calls `$.command.run` / `$.prompt.submit` / `$.prompt.fill`.
+
+The config is watched by a `$.clock.every(2000)` started in `session.start`: `$.fs.stat` compares the mtime, `$.fs.read` re-reads only on a change, and a successful parse swaps the list and calls `$.ui.invalidate("ui.render")` to ask for a repaint. That is why it does not depend on Claude Code watching the plugin directory, and stays live under every install method.
 
 `claude plugin validate <dir>` reads a plugin the way the engine will and reports what it registers, what it calls, and anything the engine would refuse — before any session loads it.
 

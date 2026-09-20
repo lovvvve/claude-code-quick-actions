@@ -37,14 +37,33 @@
 
 ## 配置
 
-动作清单在 `plugins/quick-actions/hooks/actions.ts`：
+三层，就近优先，都可以不存在：
 
-```ts
-export const ACTIONS: QuickAction[] = [
-  { hotkey: "1", label: "看改动", kind: "fill",    text: "用中文说明当前 git 工作区的改动内容和影响范围。" },
-  { hotkey: "3", label: "提交",   kind: "command", text: "commit" },
-  { hotkey: "9", label: "收工",   kind: "prompt",  text: "把今天的改动整理成一条提交并推送。" },
+| 优先级 | 位置 | 适合 |
+|---|---|---|
+| 1 | `<项目>/.claude/quick-actions.json` | 这个项目专用的动作 |
+| 2 | `~/.claude/quick-actions.json` | 你到哪都想要的那几个 |
+| 3 | `plugins/quick-actions/hooks/actions.ts` | 插件自带的默认，前两个都没有时用 |
+
+**改 JSON 不用重启，也不用重载**——插件每 2 秒看一眼文件的 mtime，变了就换上。新建、修改、删除、在项目间切换都是热的。
+
+写法两种，数组或带 `label` 的对象：
+
+```json
+[
+  { "hotkey": "1", "label": "确认", "kind": "prompt", "text": "确认" },
+  { "hotkey": "2", "label": "继续", "kind": "prompt", "text": "继续" }
 ]
+```
+
+```json
+{
+  "label": "快捷",
+  "actions": [
+    { "hotkey": "1", "label": "提交并推送", "kind": "command", "text": "gcmp" },
+    { "hotkey": "q", "label": "看改动",   "kind": "fill",    "text": "说明当前 git 工作区的改动和影响范围。" }
+  ]
+}
 ```
 
 | 字段 | 说明 |
@@ -54,6 +73,8 @@ export const ACTIONS: QuickAction[] = [
 | `kind` | `command` / `prompt` / `fill`，见下表 |
 | `text` | `command` 填命令名（不带 `/`）；`prompt` 和 `fill` 填正文 |
 
+顶层的 `label` 改按钮左边那个提示词，设成 `""` 就不画；不写则沿用插件默认。
+
 三种 `kind`：
 
 | kind | 行为 | 适合 |
@@ -62,11 +83,11 @@ export const ACTIONS: QuickAction[] = [
 | `prompt` | 直接提交给模型，不用回车 | 一句话就能说清、不需要改的固定指令 |
 | `fill` | 只填进输入框，你补完再回车 | 需要补细节的模板，比如「帮我看下 ___」 |
 
-`BAND_LABEL` 改按钮左边那个提示词，设成 `""` 就不画。
+JSON 写坏了不会让按钮消失：插件留着上一份能用的，并在 transcript 里说一句哪个文件、错在哪，同一个错只说一次。
 
-### 改完怎么生效
+### 改插件自带的默认
 
-看你是怎么装的：
+`actions.ts` 是前两层都没有时的兜底。改它要看你是怎么装的：
 
 | 安装方式 | 改 `actions.ts` 后 |
 |---|---|
@@ -74,7 +95,7 @@ export const ACTIONS: QuickAction[] = [
 | `claude --plugin-dir <目录>` | 存盘即生效，目录被 watch |
 | clone 到 `~/.claude/skills/quick-actions/` | 存盘即生效，这个位置会自动加载并被 watch |
 
-想边改边试，用后两种。marketplace 装的插件还会被 `/plugin update` 覆盖，要留住自己的清单就 fork 一份，或者换成 `~/.claude/skills/` 那条路。
+日常调整走 JSON 就行，那条路在哪种安装方式下都是热的，也不会被 `/plugin update` 冲掉。
 
 ## 键位
 
@@ -93,11 +114,14 @@ Claude Code 的 function hooks 插件可以在 `ui.render` 事件里接管界面
 
 ```
 hooks/hooks.json          modules 指向下面的模块
-hooks/quick-actions.tsx   register(on) 注册 ui.render hook，按 ACTIONS 画一排 Button
-hooks/actions.ts          你的动作清单
+hooks/quick-actions.tsx   register(on)：session.start 找配置并起轮询，ui.render 画一排 Button
+hooks/config.ts           JSON 的解析与校验，纯函数，碰不到引擎
+hooks/actions.ts          插件自带的默认清单
 ```
 
 按钮的 `onPress` 留在插件自己的环境里，按下时调 `$.command.run` / `$.prompt.submit` / `$.prompt.fill`。
+
+配置走的是 `session.start` 里起的一个 `$.clock.every(2000)`：`$.fs.stat` 比对 mtime，变了才 `$.fs.read` 重读，解析成功就换上清单并 `$.ui.invalidate("ui.render")` 请求重画。所以它不依赖 Claude Code 对插件目录的 watch，哪种安装方式下都是热的。
 
 `claude plugin validate <dir>` 可以在开会话之前，按引擎的读法检查插件会注册什么、调用什么、有没有会被拒绝的地方。
 
