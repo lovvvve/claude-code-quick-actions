@@ -37,7 +37,7 @@
 
 ## 配置
 
-动作清单在 `plugins/quick-actions/hooks/actions.ts`，**改完存盘即热重载**，不用重启 Claude Code：
+动作清单在 `plugins/quick-actions/hooks/actions.ts`：
 
 ```ts
 export const ACTIONS: QuickAction[] = [
@@ -64,7 +64,17 @@ export const ACTIONS: QuickAction[] = [
 
 `BAND_LABEL` 改按钮左边那个提示词，设成 `""` 就不画。
 
-装在 marketplace 下的插件会随 `/plugin update` 覆盖，想让自己的配置不被冲掉，fork 一份这个仓库改，或者把插件目录 clone 到 `~/.claude/skills/quick-actions/`（那个位置会自动加载，也一样热重载）。
+### 改完怎么生效
+
+看你是怎么装的：
+
+| 安装方式 | 改 `actions.ts` 后 |
+|---|---|
+| `/plugin marketplace add`（上面那条） | **要重启会话**。`/reload-plugins` 不重载 function hooks 模块，它报的 `0 hooks` 不含这类插件 |
+| `claude --plugin-dir <目录>` | 存盘即生效，目录被 watch |
+| clone 到 `~/.claude/skills/quick-actions/` | 存盘即生效，这个位置会自动加载并被 watch |
+
+想边改边试，用后两种。marketplace 装的插件还会被 `/plugin update` 覆盖，要留住自己的清单就 fork 一份，或者换成 `~/.claude/skills/` 那条路。
 
 ## 键位
 

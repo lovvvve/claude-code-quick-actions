@@ -37,7 +37,7 @@ Start a new session and the band appears above the composer.
 
 ## Configure
 
-The action list lives in `plugins/quick-actions/hooks/actions.ts`. **Saving the file hot-reloads it** — no restart:
+The action list lives in `plugins/quick-actions/hooks/actions.ts`:
 
 ```ts
 export const ACTIONS: QuickAction[] = [
@@ -64,7 +64,17 @@ The three kinds:
 
 `BAND_LABEL` sets the hint drawn to the left of the buttons; set it to `""` to drop it.
 
-A plugin installed from a marketplace is overwritten by `/plugin update`. To keep your own list, fork this repo, or clone the plugin directory into `~/.claude/skills/quick-actions/` — that location auto-loads and hot-reloads just the same.
+### Making edits take effect
+
+Depends how you installed it:
+
+| Install method | After editing `actions.ts` |
+|---|---|
+| `/plugin marketplace add` (above) | **Restart the session.** `/reload-plugins` does not reload function hooks modules — the `0 hooks` it reports excludes them |
+| `claude --plugin-dir <dir>` | Takes effect on save; the directory is watched |
+| Cloned into `~/.claude/skills/quick-actions/` | Takes effect on save; that location auto-loads and is watched |
+
+Use one of the latter two while iterating. A marketplace install is also overwritten by `/plugin update`, so fork the repo or use the `~/.claude/skills/` route to keep your own list.
 
 ## Keys
 
