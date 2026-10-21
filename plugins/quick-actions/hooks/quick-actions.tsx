@@ -1,5 +1,6 @@
+import { atom, read, update } from "claude-code"
 import type { EngineInterface, Register } from "claude-code"
-import { ACTIONS, BAND_LABEL, type QuickAction } from "./actions"
+import { ACTIONS, BAND_LABEL } from "./actions"
 import { parseConfig } from "./config"
 
 /** 多久看一眼配置文件有没有变 */
@@ -9,12 +10,15 @@ const POLL_MS = 2000
 const PROJECT_CONFIG = ".claude/quick-actions.json"
 const USER_CONFIG_LEAF = "/.claude/quick-actions.json"
 
-let actions: QuickAction[] = ACTIONS
-let bandLabel: string = BAND_LABEL
+/**
+ * 当前生效的外部配置，放在 $.state 里：热重载后还在，写入即重画读它的按钮带。
+ * null 表示没有配置文件，画 actions.ts 的内置默认——默认不进 state，改了 actions.ts 重载即见。
+ */
+const config = atom({ plugin: "quick-actions", key: "config" } as const, null)
 
 /** 按优先级排好的候选路径，session.start 时算一次 */
 let candidates: string[] = []
-/** 当前生效的配置文件，以及它上次被读到时的 mtime；undefined 表示正在用内置默认 */
+/** 上次读到的配置文件及其 mtime，只用来判断要不要重读；重载后清空，session.start 会再读一遍 */
 let activePath: string | undefined
 let activeMtime = -1
 /** 上一条抱怨，用来去重，免得轮询把同一条错误刷满屏 */
@@ -30,10 +34,13 @@ export const register: Register = (on) => {
     return next(e)
   })
 
-  on("ui.render", { surface: "terminal", component: "AbovePrompt" }, ($, e, next) => {
+  on("ui.render", { surface: "terminal", component: "AbovePrompt" }, async ($, e, next) => {
     // 问卷占用这条带时让位给它
     if (e.props.hasSurvey) return next(e)
 
+    const current = await read($, config)
+    const actions = current?.actions ?? ACTIONS
+    const bandLabel = current?.label ?? BAND_LABEL
     const { Box, Text, Button } = $.ui.resolve(e)
 
     return (
@@ -77,13 +84,10 @@ async function syncConfig($: EngineInterface): Promise<void> {
   const path = await pickExisting($)
 
   if (path === undefined) {
-    if (activePath !== undefined) {
-      activePath = undefined
-      activeMtime = -1
-      actions = ACTIONS
-      bandLabel = BAND_LABEL
-      $.ui.invalidate("ui.render")
-    }
+    activePath = undefined
+    activeMtime = -1
+    // 只在确实有变化时写，免得每次轮询都触发重画
+    if ((await read($, config)) !== null) await update($, config, () => null)
     return
   }
 
@@ -112,9 +116,7 @@ async function syncConfig($: EngineInterface): Promise<void> {
   lastComplaint = ""
   activePath = path
   activeMtime = mtimeMs
-  actions = parsed.config.actions
-  bandLabel = parsed.config.bandLabel === undefined ? BAND_LABEL : parsed.config.bandLabel
-  $.ui.invalidate("ui.render")
+  await update($, config, () => parsed.config)
 }
 
 /** 候选里第一个真实存在的 */

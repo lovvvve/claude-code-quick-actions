@@ -1,15 +1,10 @@
 // 外部配置文件的解析与校验。
 // 这一层是纯函数，碰不到引擎（$），所以单独成文件，也好单独推敲。
 
-import type { QuickAction } from "./actions"
-
-export type ParsedConfig = {
-  actions: QuickAction[]
-  bandLabel: string | undefined
-}
+import type { QuickAction, QuickActionsConfig } from "../types"
 
 export type ParseResult =
-  | { ok: true; config: ParsedConfig }
+  | { ok: true; config: QuickActionsConfig }
   | { ok: false; reason: string }
 
 const KINDS = ["prompt", "command", "fill"]
@@ -47,7 +42,7 @@ export function parseConfig(text: string): ParseResult {
   }
 
   let list: unknown
-  let bandLabel: string | undefined
+  let label: string | undefined
 
   if (Array.isArray(raw)) {
     list = raw
@@ -55,7 +50,7 @@ export function parseConfig(text: string): ParseResult {
     list = raw.actions
     if (raw.label !== undefined) {
       if (typeof raw.label !== "string") return { ok: false, reason: "label 要是字符串" }
-      bandLabel = raw.label
+      label = raw.label
     }
   } else {
     return { ok: false, reason: "顶层要是一个数组，或者带 actions 字段的对象" }
@@ -73,5 +68,5 @@ export function parseConfig(text: string): ParseResult {
     actions.push(parsed.action)
   }
 
-  return { ok: true, config: { actions, bandLabel } }
+  return { ok: true, config: label === undefined ? { actions } : { actions, label } }
 }
