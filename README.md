@@ -12,7 +12,7 @@
 
 ## 前置条件
 
-这个插件用的是 Claude Code 的 **function hooks 插件 API**，目前是 early access，默认被一个 rollout flag 关着。在 `~/.claude/settings.json` 里打开它：
+这个插件是一个 Claude Code **mod**，也就是用 function hooks 插件 API 写的插件。这套 API 目前是 early access，默认被一个 rollout flag 关着。在 `~/.claude/settings.json` 里打开它：
 
 ```json
 {
@@ -28,12 +28,26 @@
 
 ## 安装
 
+在 Claude Code 输入框里：
+
+```
+/plugin install quick-actions --marketplace lovvvve/claude-code-quick-actions
+```
+
+问是否添加 marketplace 时按 `y`，再选安装范围（默认 user）。或者在 shell 里：
+
+```
+claude plugin install quick-actions --marketplace lovvvve/claude-code-quick-actions
+```
+
+装好按钮带就出现在输入框上方；没看到就重开一个会话。
+
+旧版本没有 `--marketplace` 参数时分两步：
+
 ```
 /plugin marketplace add lovvvve/claude-code-quick-actions
 /plugin install quick-actions@claude-code-quick-actions
 ```
-
-重开一个会话，按钮带就在输入框上方了。
 
 ## 配置
 
@@ -91,7 +105,8 @@ JSON 写坏了不会让按钮消失：插件留着上一份能用的，并在 tr
 
 | 安装方式 | 改 `actions.ts` 后 |
 |---|---|
-| `/plugin marketplace add`（上面那条） | **要重启会话**。`/reload-plugins` 不重载 function hooks 模块，它报的 `0 hooks` 不含这类插件 |
+| 从 GitHub 装（上面那条） | **要重启会话**。`/reload-plugins` 不重载 function hooks 模块，它报的 `0 hooks` 不含这类插件 |
+| clone 下来，`claude plugin marketplace add <clone 目录>` 再 install | 插件直接从 clone 目录读（`claude plugin list` 里显示 `Read from: <目录>`），不是读安装时的拷贝。按 2.1.306 的文档，改完执行 `/reload-plugins` 就会重读；不生效就重启会话 |
 | `claude --plugin-dir <目录>` | 存盘即生效，目录被 watch |
 | clone 到 `~/.claude/skills/quick-actions/` | 存盘即生效，这个位置会自动加载并被 watch |
 
@@ -117,13 +132,28 @@ hooks/hooks.json          modules 指向下面的模块
 hooks/quick-actions.tsx   register(on)：session.start 找配置并起轮询，ui.render 画一排 Button
 hooks/config.ts           JSON 的解析与校验，纯函数，碰不到引擎
 hooks/actions.ts          插件自带的默认清单
+types/index.d.ts          类型契约：动作的形状，以及插件放在 $.state 里的值
+tests/                    claude plugin test 跑的用例
 ```
 
 按钮的 `onPress` 留在插件自己的环境里，按下时调 `$.command.run` / `$.prompt.submit` / `$.prompt.fill`。
 
-配置走的是 `session.start` 里起的一个 `$.clock.every(2000)`：`$.fs.stat` 比对 mtime，变了才 `$.fs.read` 重读，解析成功就换上清单并 `$.ui.invalidate("ui.render")` 请求重画。所以它不依赖 Claude Code 对插件目录的 watch，哪种安装方式下都是热的。
+配置走的是 `session.start` 里起的一个 `$.clock.every(2000)`：`$.fs.stat` 比对 mtime，变了才 `$.fs.read` 重读。所以它不依赖 Claude Code 对插件目录的 watch，哪种安装方式下都是热的。
 
-`claude plugin validate <dir>` 可以在开会话之前，按引擎的读法检查插件会注册什么、调用什么、有没有会被拒绝的地方。
+解析成功的配置写进 `$.state`（`types/index.d.ts` 里声明的 `quick-actions` → `config`），按钮带画的时候读它，所以一写入就自动重画。`$.state` 跨热重载保留；没有配置文件时存的是 `null`，内置默认不进 state，所以改了 `actions.ts`，重载后马上就能看到。
+
+## 开发
+
+```
+claude plugin validate plugins/quick-actions   # 按引擎的读法检查清单、契约，以及会被拒绝的调用
+claude plugin test plugins/quick-actions       # 跑 tests/ 下的用例
+```
+
+类型检查用插件目录里的 `tsconfig.json`，它要引擎铺在 `.claude-plugin/types/` 下的声明（不进 git）。用 `claude --plugin-dir plugins/quick-actions` 开一次交互会话就会铺好，之后：
+
+```
+npx -p typescript@5 tsc -p plugins/quick-actions
+```
 
 ## 已知限制
 

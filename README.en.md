@@ -12,7 +12,7 @@ A row of quick actions pinned directly above the Claude Code composer. With an e
 
 ## Prerequisite
 
-This plugin uses Claude Code's **function hooks plugin API**, which is early access and gated off by default. Turn it on in `~/.claude/settings.json`:
+This plugin is a Claude Code **mod**: a plugin built on the function hooks plugin API. That API is early access and gated off by default. Turn it on in `~/.claude/settings.json`:
 
 ```json
 {
@@ -28,12 +28,26 @@ Requires Claude Code 2.1.278 or newer.
 
 ## Install
 
+At the Claude Code prompt:
+
+```
+/plugin install quick-actions --marketplace lovvvve/claude-code-quick-actions
+```
+
+Answer `y` to add the marketplace, then pick a scope (user is the default). Or from a shell:
+
+```
+claude plugin install quick-actions --marketplace lovvvve/claude-code-quick-actions
+```
+
+Once installed, the band appears above the composer; if it does not, start a new session.
+
+On older versions without `--marketplace`, use two steps:
+
 ```
 /plugin marketplace add lovvvve/claude-code-quick-actions
 /plugin install quick-actions@claude-code-quick-actions
 ```
-
-Start a new session and the band appears above the composer.
 
 ## Configure
 
@@ -91,7 +105,8 @@ Broken JSON does not make the buttons vanish: the plugin keeps the last good lis
 
 | Install method | After editing `actions.ts` |
 |---|---|
-| `/plugin marketplace add` (above) | **Restart the session.** `/reload-plugins` does not reload function hooks modules — the `0 hooks` it reports excludes them |
+| Installed from GitHub (above) | **Restart the session.** `/reload-plugins` does not reload function hooks modules — the `0 hooks` it reports excludes them |
+| Cloned, then `claude plugin marketplace add <clone dir>` and install | The plugin is read straight from the clone (`claude plugin list` shows `Read from: <dir>`), not from a copy made at install. Per the 2.1.306 docs, `/reload-plugins` re-reads it after an edit; restart the session if it does not |
 | `claude --plugin-dir <dir>` | Takes effect on save; the directory is watched |
 | Cloned into `~/.claude/skills/quick-actions/` | Takes effect on save; that location auto-loads and is watched |
 
@@ -117,13 +132,28 @@ hooks/hooks.json          points at the module below
 hooks/quick-actions.tsx   register(on): session.start locates the config and starts the poll, ui.render draws the buttons
 hooks/config.ts           parsing and validation of the JSON; pure functions, no engine access
 hooks/actions.ts          the plugin's own default list
+types/index.d.ts          the type contract: an action's shape, and the value the plugin keeps in $.state
+tests/                    cases run by claude plugin test
 ```
 
 Each button's `onPress` stays in the plugin's own environment and calls `$.command.run` / `$.prompt.submit` / `$.prompt.fill`.
 
-The config is watched by a `$.clock.every(2000)` started in `session.start`: `$.fs.stat` compares the mtime, `$.fs.read` re-reads only on a change, and a successful parse swaps the list and calls `$.ui.invalidate("ui.render")` to ask for a repaint. That is why it does not depend on Claude Code watching the plugin directory, and stays live under every install method.
+The config is watched by a `$.clock.every(2000)` started in `session.start`: `$.fs.stat` compares the mtime and `$.fs.read` re-reads only on a change. That is why it does not depend on Claude Code watching the plugin directory, and stays live under every install method.
 
-`claude plugin validate <dir>` reads a plugin the way the engine will and reports what it registers, what it calls, and anything the engine would refuse — before any session loads it.
+A successful parse is written to `$.state` (`quick-actions` → `config`, declared in `types/index.d.ts`). The band reads it while drawing, so a write repaints it. `$.state` survives hot reloads. With no config file it holds `null`; the built-in defaults never go into state, so an edit to `actions.ts` shows up as soon as the plugin reloads.
+
+## Development
+
+```
+claude plugin validate plugins/quick-actions   # checks the manifest, the contract and any call the engine would refuse
+claude plugin test plugins/quick-actions       # runs the cases under tests/
+```
+
+Type-checking uses the plugin's `tsconfig.json`, which needs the declarations the engine lays in `.claude-plugin/types/` (kept out of git). One interactive session started with `claude --plugin-dir plugins/quick-actions` lays them; after that:
+
+```
+npx -p typescript@5 tsc -p plugins/quick-actions
+```
 
 ## Known limits
 
